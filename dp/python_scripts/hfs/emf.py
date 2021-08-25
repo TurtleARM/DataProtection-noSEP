@@ -1,7 +1,9 @@
 from construct import Struct, ULInt16, ULInt32, String
 from construct.macros import ULInt64, Padding, If
 from crypto.aes import AESencryptCBC, AESdecryptCBC
+from crypto.curve25519 import curve25519
 from hfs import HFSVolume, HFSFile
+from Crypto.Hash import SHA256
 #from keystore.keybag import Keybag  remove keybag parsing as dependency
 from structs import HFSPlusVolumeHeader, kHFSPlusFileRecord, getString, \
     kHFSRootParentID
@@ -170,22 +172,31 @@ class EMFVolume(HFSVolume):
             iv += struct.pack("<L", lba)
         return iv
     
+    def unwrapCurve25519(self, persistent_key):
+        assert len(persistent_key) == 0x48
+        mysecret = "3BDE91C328279848A3BA02C6F2524636FA29A8D59F42303D356B30FFD2C0D1B86C155455d843FAEF"
+        mypublic = "1E4EA1DFDF2D80A6BC7C101E365AD7673855F3C713E67D20B950DA31DAABAC4D"
+        hispublic = persistent_key[:32]
+        shared = curve25519(mysecret, hispublic)
+        md = sha256('\x00\x00\x00\x01' + shared + hispublic + mypublic).digest()
+        return AESUnwrap(md, persistent_key[32:])
+
     def getFileKeyForCprotect(self, cp):
         if self.cp_major_version == None:
             self.cp_major_version = struct.unpack("<H", cp[:2])[0]
         cprotect = cprotect_xattr_v5.parse(cp)
-        #return self.keybag.unwrapKeyForClass(cprotect.persistent_class, cprotect.persistent_key)
-        if cprotect.persistent_class == 4:
+        #return self.keybag.unwrapKeyForClass(cprotect.persistent_class, cprotect.persistent_key) no need for keybag
+        if cprotect.persistent_class == 4: # DKey
             ck = "90562A56314E2DC685AFFCC0767467EA28778A6206CF5107347140EA1508C835".decode('hex') #self.classKeys[clas]["KEY"]
         elif cprotect.persistent_class == 1:
             ck = "84A67F7691FD733626527394DD87B4DD8F991A34EAB07EA845FCF2F443DF3403".decode('hex')
         elif cprotect.persistent_class == 3:
-            ck = "F805F732A4BE479B65FBCAAAE503308F4BEA88f16E7249E55A7984d00FCC8D27".decode('hex')
+            ck = "F805F732A4BE479B65FBCAAAE503308F4BEA88F16E7249E55A7984D00FCC8D27".decode('hex')
+        elif cprotect.persistent_class == 2: # Asymmetric encryption: privkey only available after first unlock
+            return self.unwrapCurve25519(cprotect.persistent_key)
         else:
-            print "Skipping class 2 file... :("
+            print "Skipping unknown class file... :("
             return 0
-        # if self.attrs.get("VERS", 2) >= 3 and self.classKeys[clas].get("KTYP", 0) == 1:
-        #     return self.unwrapCurve25519(clas, persistent_key)
         if len(cprotect.persistent_key) == 0x28:
             return AESUnwrap(ck, cprotect.persistent_key)
         else:

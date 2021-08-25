@@ -56,4 +56,5 @@ with open(filename, "rb") as f:
             formattedpub += hex(byte).replace("0x", "\\x")
         for byte in privkey:
             formatted += hex(byte).replace("0x", "\\x")
-        print("Wrapped keypair: {}".format(formattedpub + formatted))
+        print("Private Key: {}".format(formatted))
+        print("Public Key: {}".format(formattedpub))
