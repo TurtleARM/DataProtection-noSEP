@@ -3,7 +3,7 @@ from construct.macros import ULInt64, Padding, If
 from crypto.aes import AESencryptCBC, AESdecryptCBC
 from crypto.curve25519 import curve25519
 from hfs import HFSVolume, HFSFile
-from Crypto.Hash import SHA256
+from hashlib import sha256
 #from keystore.keybag import Keybag  remove keybag parsing as dependency
 from structs import HFSPlusVolumeHeader, kHFSPlusFileRecord, getString, \
     kHFSRootParentID
@@ -174,8 +174,8 @@ class EMFVolume(HFSVolume):
     
     def unwrapCurve25519(self, persistent_key):
         assert len(persistent_key) == 0x48
-        mysecret = "3BDE91C328279848A3BA02C6F2524636FA29A8D59F42303D356B30FFD2C0D1B86C155455d843FAEF"
-        mypublic = "1E4EA1DFDF2D80A6BC7C101E365AD7673855F3C713E67D20B950DA31DAABAC4D"
+        mysecret = "a63601a12737a0ceadaa9b517bb9e3c6c0c16dc3f6259fdecfec14750d293b3b".decode('hex')
+        mypublic = "1e4ea1dfdf2d80a6bc7c101e365ad7673855f3c713e67d20b950da31daabac4d".decode('hex')
         hispublic = persistent_key[:32]
         shared = curve25519(mysecret, hispublic)
         md = sha256('\x00\x00\x00\x01' + shared + hispublic + mypublic).digest()
